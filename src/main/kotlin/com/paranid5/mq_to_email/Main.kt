@@ -2,6 +2,7 @@ package com.paranid5.mq_to_email
 
 import com.rabbitmq.client.*
 import io.github.cdimascio.dotenv.dotenv
+import kotlinx.serialization.json.Json
 import java.nio.charset.Charset
 import java.util.Properties
 import javax.mail.Authenticator
@@ -23,6 +24,10 @@ private const val EMAIL_PORT = "465"
 private const val HOST = "localhost"
 private const val QUEUE_USER_MESSAGE = "user_message"
 
+private val json = Json {
+    ignoreUnknownKeys = true
+}
+
 data class EmailMessageCredentials(
     val username: String,
     val password: String,
@@ -30,7 +35,7 @@ data class EmailMessageCredentials(
     val to: String,
 )
 
-private fun sendEmail(message: String, credentials: EmailMessageCredentials) {
+private fun sendEmail(msgData: MQMessage, credentials: EmailMessageCredentials) {
     val props = Properties().also { props ->
         props["mail.smtp.host"] = EMAIL_HOST
         props["mail.smtp.port"] = EMAIL_PORT
@@ -48,8 +53,8 @@ private fun sendEmail(message: String, credentials: EmailMessageCredentials) {
         val emailMsg = MimeMessage(session).apply {
             setFrom(InternetAddress(credentials.from))
             setRecipients(Message.RecipientType.TO, InternetAddress.parse(credentials.to))
-            subject = "Message ${System.currentTimeMillis()}"
-            setText(message)
+            subject = "Message from ${msgData.username}"
+            setText(msgData.message)
         }
 
         Transport.send(emailMsg)
@@ -78,7 +83,10 @@ fun main() {
 
             while (true) {
                 channel.basicConsume(QUEUE_USER_MESSAGE, autoAck, { _, delivery ->
-                    val message = delivery.body.toString(Charset.forName(Charsets.UTF_8.name()))
+                    val message = json.decodeFromString<MQMessage>(
+                        delivery.body.toString(Charset.forName(Charsets.UTF_8.name()))
+                    )
+
                     sendEmail(message, credentials)
                 }) { _ -> }
             }

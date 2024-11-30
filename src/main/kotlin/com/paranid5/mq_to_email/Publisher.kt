@@ -1,9 +1,15 @@
 package com.paranid5.mq_to_email
 
 import com.rabbitmq.client.ConnectionFactory
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 private const val HOST = "localhost"
 private const val QUEUE_USER_MESSAGE = "user_message"
+
+private val json = Json {
+    ignoreUnknownKeys = true
+}
 
 fun main() {
     ConnectionFactory().apply { host = HOST }.newConnection().use { connection ->
@@ -16,7 +22,10 @@ fun main() {
             channel.queueDeclare(QUEUE_USER_MESSAGE, durable, exclusive, autoDelete, args)
 
             while (true) {
-                channel.basicPublish("", QUEUE_USER_MESSAGE, null, "test ${System.currentTimeMillis()}".toByteArray())
+                val message = MQMessage(username = "bober", message = "kurwa")
+                val encoded = json.encodeToString(message).toByteArray()
+
+                channel.basicPublish("", QUEUE_USER_MESSAGE, null, encoded)
                 Thread.sleep(5000)
             }
         }
