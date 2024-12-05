@@ -22,7 +22,7 @@ fun main() {
             channel.queueDeclare(QUEUE_USER_MESSAGE, durable, exclusive, autoDelete, args)
 
             while (true) {
-                val message = MQMessage(username = "bober", message = "kurwa")
+                val message = MQMessage(username = "bober", message = "kurwa", timestampSecs = System.currentTimeMillis() / 1000.0)
                 val encoded = json.encodeToString(message).toByteArray()
 
                 channel.basicPublish("", QUEUE_USER_MESSAGE, null, encoded)

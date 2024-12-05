@@ -22,7 +22,7 @@ private const val EMAIL_HOST = "smtp.yandex.ru"
 private const val EMAIL_PORT = "465"
 
 private const val HOST = "localhost"
-private const val QUEUE_USER_MESSAGE = "user_message"
+private const val QUEUE_USER_MESSAGE = "email_queue"
 
 private val json = Json {
     ignoreUnknownKeys = true
@@ -75,19 +75,27 @@ fun main() {
         connection.createChannel().use { channel ->
             val durable = false
             val exclusive = false
-            val autoDelete = true
+            val autoDelete = false
             val args = null
-            val autoAck = true
+            val autoAck = false
 
             channel.queueDeclare(QUEUE_USER_MESSAGE, durable, exclusive, autoDelete, args)
 
             while (true) {
                 channel.basicConsume(QUEUE_USER_MESSAGE, autoAck, { _, delivery ->
-                    val message = json.decodeFromString<MQMessage>(
-                        delivery.body.toString(Charset.forName(Charsets.UTF_8.name()))
-                    )
+                    runCatching {
+                        val message = json.decodeFromString<MQMessage>(
+                            delivery.body.toString(Charset.forName(Charsets.UTF_8.name()))
+                        )
 
-                    sendEmail(message, credentials)
+                        println("Received message: $message")
+
+                        sendEmail(message, credentials)
+
+                        val endTime = System.currentTimeMillis()
+                        val startTime = (message.timestampSecs * 1000).toLong()
+                        println("Email is sent, total time: ${endTime - startTime} ms")
+                    }.onFailure { it.printStackTrace() }
                 }) { _ -> }
             }
         }
